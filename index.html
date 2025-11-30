@@ -98,23 +98,25 @@
       background: #ffffff;
       overflow-y: auto;
       padding: 24px 0 40px;
+      -webkit-overflow-scrolling: touch;
     }
 
     #carouselInner {
       width: 100%;
       max-width: 420px;
       margin: 0 auto;
-      padding: 0 16px 40px;
+      padding: 0 16px 20px;
     }
 
     .posterCard {
       width: 100%;
-      margin: 20px 0;
+      margin: 24px 0;
       border-radius: 24px;
       background: #fff;
       box-shadow: 0 10px 30px rgba(0,0,0,0.12);
       overflow: hidden;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      transform-origin: center center;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
     }
 
     .posterCard img {
@@ -124,8 +126,11 @@
     }
 
     .posterCard:hover {
-      transform: translateY(-4px);
       box-shadow: 0 14px 40px rgba(0,0,0,0.18);
+    }
+
+    .posterCard.active {
+      box-shadow: 0 16px 50px rgba(0,0,0,0.25);
     }
 
     .posterLabel {
@@ -134,6 +139,59 @@
       text-transform: uppercase;
       letter-spacing: .12em;
       color: #777;
+    }
+
+    /* Connections panel under carousel */
+
+    #connectionsPanel {
+      max-width: 420px;
+      margin: 0 auto 24px;
+      padding: 12px 16px 24px;
+      border-top: 1px solid #eee;
+      font-size: 12px;
+      color: #555;
+    }
+
+    #connectionsPanel.hidden {
+      display: none;
+    }
+
+    .connectionsTitle {
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      font-size: 11px;
+      margin-bottom: 8px;
+      color: #888;
+    }
+
+    .connectionList {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 260px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .connectionItem {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .connectionItem img {
+      width: 60px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+      flex-shrink: 0;
+    }
+
+    .connectionLabel {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: #555;
     }
 
     /* ---------- Mode 2: Room view ---------- */
@@ -146,8 +204,8 @@
     #viewport {
       position: absolute;
       inset: 0;
-      overflow: auto;       /* scroll to pan around the room */
-      -webkit-overflow-scrolling: touch;
+      overflow: hidden;
+      touch-action: none; /* we'll handle gestures ourselves */
     }
 
     #roomWrapper {
@@ -155,7 +213,6 @@
       width: 2000px;
       height: 1400px;
       margin: 40px;
-      /* faint red grid */
       background-color: #ffffff;
       background-image:
         linear-gradient(to right, rgba(154,15,15,0.12) 1px, transparent 1px),
@@ -163,9 +220,9 @@
       background-size: 40px 40px;
       border-radius: 16px;
       box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+      transform-origin: 0 0;
     }
 
-    /* SVG overlay for connections */
     #lines {
       position: absolute;
       top: 0;
@@ -203,7 +260,6 @@
       outline-offset: 3px;
     }
 
-    /* Mobile tweaks */
     @media (max-width: 600px) {
       #roomWrapper {
         margin: 20px;
@@ -219,7 +275,7 @@
 </head>
 <body>
 
-  <!-- Top bar with sleek toggle -->
+  <!-- Top bar with mode toggle -->
   <div id="topBar">
     <div id="title">CRC Poster Network Demo</div>
     <button id="modeToggle" type="button">
@@ -231,6 +287,10 @@
   <!-- Mode 1: Carousel -->
   <div id="carouselMode" class="mode active">
     <div id="carouselInner"></div>
+    <div id="connectionsPanel" class="hidden">
+      <div class="connectionsTitle">Connected projects</div>
+      <div class="connectionList" id="connectionList"></div>
+    </div>
   </div>
 
   <!-- Mode 2: Room view -->
@@ -238,7 +298,7 @@
     <div id="viewport">
       <div id="roomWrapper">
         <svg id="lines"></svg>
-        <!-- nodes injected via JS -->
+        <!-- nodes injected here -->
       </div>
     </div>
   </div>
@@ -254,7 +314,6 @@
       "C05.png","C.png"
     ];
 
-    // Coordinates for room layout
     const coords = {
       "DH.png":  [600, 150],
       "A01.png": [800, 150],
@@ -283,6 +342,11 @@
     };
 
     const C02_LINKS = ["A01.png","B01.png","B02.png","A06.png","A03.png"];
+
+    const CONNECTIONS = {
+      "C02.png": C02_LINKS
+      // later we can add other posters here
+    };
 
     /* ---------------- MODE SWITCH ---------------- */
 
@@ -315,29 +379,93 @@
 
     /* ---------------- MODE 1: CAROUSEL ---------------- */
 
+    const carouselInner = document.getElementById("carouselInner");
+    const connectionsPanel = document.getElementById("connectionsPanel");
+    const connectionList   = document.getElementById("connectionList");
+    let activePoster = null;
+
     function initCarousel() {
-      const container = document.getElementById("carouselInner");
       posters.forEach(p => {
         const card = document.createElement("div");
         card.className = "posterCard";
+        card.dataset.poster = p;
         card.innerHTML = `
           <img src="${p}" alt="${p}">
           <div class="posterLabel">${p.replace(".png","")}</div>
         `;
-        container.appendChild(card);
+        card.addEventListener("click", () => selectPosterInCarousel(p));
+        carouselInner.appendChild(card);
+      });
+
+      // initial scaling
+      requestAnimationFrame(updateCarouselTransforms);
+      carouselInner.addEventListener("scroll", () => {
+        requestAnimationFrame(updateCarouselTransforms);
+      });
+      window.addEventListener("resize", () => {
+        requestAnimationFrame(updateCarouselTransforms);
+      });
+    }
+
+    function updateCarouselTransforms() {
+      const rect = carouselInner.getBoundingClientRect();
+      const centerY = rect.top + rect.height / 2;
+
+      const cards = carouselInner.querySelectorAll(".posterCard");
+      cards.forEach(card => {
+        const r = card.getBoundingClientRect();
+        const cardCenter = r.top + r.height / 2;
+        const dist = Math.abs(centerY - cardCenter);
+        const maxDist = rect.height / 2 + r.height;
+        const t = Math.min(dist / maxDist, 1); // 0 near center, 1 far
+        const scale = 1.05 - 0.3 * t;          // 1.05 -> 0.75
+        const opacity = 1 - 0.25 * t;          // 1 -> 0.75
+        card.style.transform = `scale(${scale})`;
+        card.style.opacity = opacity;
+      });
+    }
+
+    function selectPosterInCarousel(posterName) {
+      activePoster = posterName;
+      // highlight card
+      const cards = carouselInner.querySelectorAll(".posterCard");
+      cards.forEach(card => {
+        card.classList.toggle("active", card.dataset.poster === posterName);
+      });
+
+      // show connections if we have them
+      const links = CONNECTIONS[posterName];
+      if (!links) {
+        connectionsPanel.classList.add("hidden");
+        connectionList.innerHTML = "";
+        return;
+      }
+
+      connectionsPanel.classList.remove("hidden");
+      connectionList.innerHTML = "";
+
+      links.forEach(target => {
+        const item = document.createElement("div");
+        item.className = "connectionItem";
+        item.innerHTML = `
+          <img src="${target}" alt="${target}">
+          <div class="connectionLabel">${target.replace(".png","")}</div>
+        `;
+        connectionList.appendChild(item);
       });
     }
 
     /* ---------------- MODE 2: ROOM VIEW ---------------- */
 
-    const linesSvg   = document.getElementById("lines");
     const roomWrapper = document.getElementById("roomWrapper");
-    const nodeElements = {};   // filename -> DOM node
+    const linesSvg    = document.getElementById("lines");
+    const viewport    = document.getElementById("viewport");
+    const nodeElements = {};
 
     function initRoom() {
       for (const p of posters) {
         const [x,y] = coords[p];
-        if (!x || !y) continue; // safety
+        if (!x || !y) continue;
 
         const node = document.createElement("div");
         node.className = "posterNode";
@@ -347,7 +475,6 @@
           <img src="${p}" alt="${p}">
           <div class="posterNodeLabel">${p.replace(".png","")}</div>
         `;
-
         node.addEventListener("click", () => handleNodeClick(p));
 
         roomWrapper.appendChild(node);
@@ -373,23 +500,99 @@
       C02_LINKS.forEach(target => {
         const end = coords[target];
         if (!end) return;
+
         const line = document.createElementNS("http://www.w3.org/2000/svg","line");
         line.setAttribute("x1", start[0]);
         line.setAttribute("y1", start[1]);
         line.setAttribute("x2", end[0]);
         line.setAttribute("y2", end[1]);
         line.setAttribute("stroke", "#9a0f0f");
-        line.setAttribute("stroke-width", "3");
+        line.setAttribute("stroke-width", "2");
         line.setAttribute("stroke-linecap", "round");
+
+        // animate "shooting" line
+        const dx = end[0] - start[0];
+        const dy = end[1] - start[1];
+        const length = Math.sqrt(dx*dx + dy*dy);
+        line.style.strokeDasharray = length;
+        line.style.strokeDashoffset = length;
+
         linesSvg.appendChild(line);
+
+        requestAnimationFrame(() => {
+          line.style.transition = "stroke-dashoffset 0.6s ease";
+          line.style.strokeDashoffset = "0";
+        });
       });
+    }
+
+    /* ---- Pinch zoom + pan ---- */
+
+    let scale = 1;
+    let translateX = 0;
+    let translateY = 0;
+    let startScale = 1;
+    let initialPinchDistance = null;
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+
+    function applyTransform() {
+      roomWrapper.style.transform =
+        `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+    }
+
+    viewport.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 2) {
+        isPanning = false;
+        initialPinchDistance = getDistance(e.touches[0], e.touches[1]);
+        startScale = scale;
+      } else if (e.touches.length === 1) {
+        isPanning = true;
+        panStartX = e.touches[0].clientX - translateX;
+        panStartY = e.touches[0].clientY - translateY;
+      }
+    }, { passive: false });
+
+    viewport.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      if (e.touches.length === 2 && initialPinchDistance) {
+        const currentDistance = getDistance(e.touches[0], e.touches[1]);
+        const factor = currentDistance / initialPinchDistance;
+        scale = clamp(startScale * factor, 0.6, 2.5);
+        applyTransform();
+      } else if (e.touches.length === 1 && isPanning) {
+        translateX = e.touches[0].clientX - panStartX;
+        translateY = e.touches[0].clientY - panStartY;
+        applyTransform();
+      }
+    }, { passive: false });
+
+    viewport.addEventListener("touchend", (e) => {
+      if (e.touches.length < 2) {
+        initialPinchDistance = null;
+      }
+      if (e.touches.length === 0) {
+        isPanning = false;
+      }
+    });
+
+    function getDistance(t1, t2) {
+      const dx = t1.clientX - t2.clientX;
+      const dy = t1.clientY - t2.clientY;
+      return Math.sqrt(dx*dx + dy*dy);
+    }
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
     }
 
     /* ---------------- INIT ---------------- */
 
     initCarousel();
     initRoom();
-    showCarousel();   // start in carousel mode
+    showCarousel();
+    applyTransform(); // initial
   </script>
 </body>
 </html>
