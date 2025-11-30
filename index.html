@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CRC Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+ body { margin:0; font-family:Montserrat, sans-serif; overflow:hidden; }
+ #modeToggle { position:fixed; top:20px; right:20px; z-index:10; }
+ #carouselMode, #roomMode { width:100vw; height:100vh; display:none; }
+ #carouselMode.active, #roomMode.active { display:block; }
+ .posterCard { width:200px; margin:20px auto; }
+ .posterCard img{ width:100%; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.2); }
+ #roomCanvas { width:2000px; height:1400px; position:relative; background:white; }
+ .posterNode { position:absolute; width:120px; cursor:pointer; text-align:center; }
+ .posterNode img{ width:100%; border-radius:6px; box-shadow:0 2px 5px rgba(0,0,0,0.15); }
+ svg { position:absolute; top:0; left:0; pointer-events:none; }
+</style>
+</head>
+<body>
+<button id="modeToggle">Switch Mode</button>
+<div id="carouselMode" class="active">
+  <!-- Posters loaded dynamically -->
+</div>
+<div id="roomMode">
+  <div id="viewport" style="width:100%;height:100%;overflow:hidden;position:relative;">
+    <div id="roomCanvas"></div>
+    <svg id="lines"></svg>
+  </div>
+</div>
+<script>
+const posters = [
+ 'DH.png','A01.png','A02.png','A03.png',
+ 'A04.png','A05.png','A06.png','R.png',
+ 'B01.png','B02.png','B03.png','B04.png','B05.png','B06.png',
+ 'C01.png','C02.png','C03.png','C04.png',
+ 'C05.png','C.png'
+];
+
+function loadCarousel(){
+ const c = document.getElementById('carouselMode');
+ posters.forEach(p=>{
+   const card=document.createElement('div');
+   card.className='posterCard';
+   card.innerHTML=`<img src="${p}" />`;
+   c.appendChild(card);
+ });
+}
+
+function loadRoom(){
+ const coords={
+  'DH.png':[600,50], 'A01.png':[750,50], 'A02.png':[900,50], 'A03.png':[1050,50],
+  'A04.png':[200,200], 'A05.png':[200,350], 'A06.png':[200,500], 'R.png':[200,650],
+  'B01.png':[1500,200],'B02.png':[1500,350],'B03.png':[1500,500],'B04.png':[1500,650],'B05.png':[1500,800],'B06.png':[1500,950],
+  'C01.png':[600,1100],'C02.png':[750,1100],'C03.png':[900,1100],'C04.png':[1050,1100],
+  'C05.png':[850,700],'C.png':[950,700]
+ };
+ const canvas=document.getElementById('roomCanvas');
+ for(const p of posters){
+  const n=document.createElement('div'); n.className='posterNode';
+  n.style.left=coords[p][0]+'px'; n.style.top=coords[p][1]+'px';
+  n.innerHTML=`<img src="${p}"><div>${p.replace('.png','')}</div>`;
+  n.onclick=()=>handleClick(p,coords);
+  canvas.appendChild(n);
+ }
+}
+
+function handleClick(p,coords){
+ const lines=document.getElementById('lines');
+ lines.innerHTML='';
+ if(p!=='C02.png') return;
+ const targets=['A01.png','B01.png','B02.png','A06.png','A03.png'];
+ const start=coords['C02.png'];
+ targets.forEach(t=>{
+  const end=coords[t];
+  const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+  line.setAttribute('x1',start[0]+60);
+  line.setAttribute('y1',start[1]+60);
+  line.setAttribute('x2',end[0]+60);
+  line.setAttribute('y2',end[1]+60);
+  line.setAttribute('stroke','#9a0f0f'); line.setAttribute('stroke-width','3');
+  lines.appendChild(line);
+ });
+}
+
+loadCarousel(); loadRoom();
+
+document.getElementById('modeToggle').onclick=()=>{
+ document.getElementById('carouselMode').classList.toggle('active');
+ document.getElementById('roomMode').classList.toggle('active');
+};
+</script>
+</body>
+</html>
