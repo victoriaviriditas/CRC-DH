@@ -1,97 +1,395 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CRC Demo</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
-<style>
- body { margin:0; font-family:Montserrat, sans-serif; overflow:hidden; }
- #modeToggle { position:fixed; top:20px; right:20px; z-index:10; }
- #carouselMode, #roomMode { width:100vw; height:100vh; display:none; }
- #carouselMode.active, #roomMode.active { display:block; }
- .posterCard { width:200px; margin:20px auto; }
- .posterCard img{ width:100%; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.2); }
- #roomCanvas { width:2000px; height:1400px; position:relative; background:white; }
- .posterNode { position:absolute; width:120px; cursor:pointer; text-align:center; }
- .posterNode img{ width:100%; border-radius:6px; box-shadow:0 2px 5px rgba(0,0,0,0.15); }
- svg { position:absolute; top:0; left:0; pointer-events:none; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRC Poster Network Demo</title>
+
+  <!-- Montserrat -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --crc-red: #9a0f0f;
+      --bg-light: #f7f7f7;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: white;
+      color: #222;
+    }
+
+    /* ---------- Top bar / mode switch ---------- */
+
+    #topBar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+      z-index: 20;
+    }
+
+    #title {
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #666;
+    }
+
+    #modeToggle {
+      border: none;
+      outline: none;
+      padding: 6px;
+      border-radius: 999px;
+      background: #f0f0f0;
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+      font-size: 12px;
+      position: relative;
+    }
+
+    #modeToggle span {
+      padding: 4px 12px;
+      border-radius: 999px;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    #modeToggle .active {
+      background: var(--crc-red);
+      color: #fff;
+    }
+
+    /* ---------- Modes ---------- */
+
+    .mode {
+      position: fixed;
+      top: 56px;          /* under top bar */
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: none;
+    }
+
+    .mode.active {
+      display: block;
+    }
+
+    /* ---------- Mode 1: Carousel ---------- */
+
+    #carouselMode {
+      background: #ffffff;
+      overflow-y: auto;
+      padding: 24px 0 40px;
+    }
+
+    #carouselInner {
+      width: 100%;
+      max-width: 420px;
+      margin: 0 auto;
+      padding: 0 16px 40px;
+    }
+
+    .posterCard {
+      width: 100%;
+      margin: 20px 0;
+      border-radius: 24px;
+      background: #fff;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+      overflow: hidden;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .posterCard img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .posterCard:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 14px 40px rgba(0,0,0,0.18);
+    }
+
+    .posterLabel {
+      padding: 8px 14px 10px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: #777;
+    }
+
+    /* ---------- Mode 2: Room view ---------- */
+
+    #roomMode {
+      background: #ffffff;
+      overflow: hidden;
+    }
+
+    #viewport {
+      position: absolute;
+      inset: 0;
+      overflow: auto;       /* scroll to pan around the room */
+      -webkit-overflow-scrolling: touch;
+    }
+
+    #roomWrapper {
+      position: relative;
+      width: 2000px;
+      height: 1400px;
+      margin: 40px;
+      /* faint red grid */
+      background-color: #ffffff;
+      background-image:
+        linear-gradient(to right, rgba(154,15,15,0.12) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(154,15,15,0.12) 1px, transparent 1px);
+      background-size: 40px 40px;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+    }
+
+    /* SVG overlay for connections */
+    #lines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 2000px;
+      height: 1400px;
+      pointer-events: none;
+    }
+
+    .posterNode {
+      position: absolute;
+      width: 140px;
+      cursor: pointer;
+      text-align: center;
+      transform: translate(-50%, -50%);
+    }
+
+    .posterNode img {
+      width: 100%;
+      border-radius: 12px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+      display: block;
+    }
+
+    .posterNodeLabel {
+      margin-top: 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .14em;
+      color: #555;
+    }
+
+    .posterNode.active img {
+      outline: 3px solid var(--crc-red);
+      outline-offset: 3px;
+    }
+
+    /* Mobile tweaks */
+    @media (max-width: 600px) {
+      #roomWrapper {
+        margin: 20px;
+        width: 1600px;
+        height: 1200px;
+      }
+      #lines {
+        width: 1600px;
+        height: 1200px;
+      }
+    }
+  </style>
 </head>
 <body>
-<button id="modeToggle">Switch Mode</button>
-<div id="carouselMode" class="active">
-  <!-- Posters loaded dynamically -->
-</div>
-<div id="roomMode">
-  <div id="viewport" style="width:100%;height:100%;overflow:hidden;position:relative;">
-    <div id="roomCanvas"></div>
-    <svg id="lines"></svg>
+
+  <!-- Top bar with sleek toggle -->
+  <div id="topBar">
+    <div id="title">CRC Poster Network Demo</div>
+    <button id="modeToggle" type="button">
+      <span id="toggleCarousel" class="active">Carousel</span>
+      <span id="toggleRoom">Room view</span>
+    </button>
   </div>
-</div>
-<script>
-const posters = [
- 'DH.png','A01.png','A02.png','A03.png',
- 'A04.png','A05.png','A06.png','R.png',
- 'B01.png','B02.png','B03.png','B04.png','B05.png','B06.png',
- 'C01.png','C02.png','C03.png','C04.png',
- 'C05.png','C.png'
-];
 
-function loadCarousel(){
- const c = document.getElementById('carouselMode');
- posters.forEach(p=>{
-   const card=document.createElement('div');
-   card.className='posterCard';
-   card.innerHTML=`<img src="${p}" />`;
-   c.appendChild(card);
- });
-}
+  <!-- Mode 1: Carousel -->
+  <div id="carouselMode" class="mode active">
+    <div id="carouselInner"></div>
+  </div>
 
-function loadRoom(){
- const coords={
-  'DH.png':[600,50], 'A01.png':[750,50], 'A02.png':[900,50], 'A03.png':[1050,50],
-  'A04.png':[200,200], 'A05.png':[200,350], 'A06.png':[200,500], 'R.png':[200,650],
-  'B01.png':[1500,200],'B02.png':[1500,350],'B03.png':[1500,500],'B04.png':[1500,650],'B05.png':[1500,800],'B06.png':[1500,950],
-  'C01.png':[600,1100],'C02.png':[750,1100],'C03.png':[900,1100],'C04.png':[1050,1100],
-  'C05.png':[850,700],'C.png':[950,700]
- };
- const canvas=document.getElementById('roomCanvas');
- for(const p of posters){
-  const n=document.createElement('div'); n.className='posterNode';
-  n.style.left=coords[p][0]+'px'; n.style.top=coords[p][1]+'px';
-  n.innerHTML=`<img src="${p}"><div>${p.replace('.png','')}</div>`;
-  n.onclick=()=>handleClick(p,coords);
-  canvas.appendChild(n);
- }
-}
+  <!-- Mode 2: Room view -->
+  <div id="roomMode" class="mode">
+    <div id="viewport">
+      <div id="roomWrapper">
+        <svg id="lines"></svg>
+        <!-- nodes injected via JS -->
+      </div>
+    </div>
+  </div>
 
-function handleClick(p,coords){
- const lines=document.getElementById('lines');
- lines.innerHTML='';
- if(p!=='C02.png') return;
- const targets=['A01.png','B01.png','B02.png','A06.png','A03.png'];
- const start=coords['C02.png'];
- targets.forEach(t=>{
-  const end=coords[t];
-  const line=document.createElementNS('http://www.w3.org/2000/svg','line');
-  line.setAttribute('x1',start[0]+60);
-  line.setAttribute('y1',start[1]+60);
-  line.setAttribute('x2',end[0]+60);
-  line.setAttribute('y2',end[1]+60);
-  line.setAttribute('stroke','#9a0f0f'); line.setAttribute('stroke-width','3');
-  lines.appendChild(line);
- });
-}
+  <script>
+    /* ---------------- DATA ---------------- */
 
-loadCarousel(); loadRoom();
+    const posters = [
+      "DH.png","A01.png","A02.png","A03.png",
+      "A04.png","A05.png","A06.png","R.png",
+      "B01.png","B02.png","B03.png","B04.png","B05.png","B06.png",
+      "C01.png","C02.png","C03.png","C04.png",
+      "C05.png","C.png"
+    ];
 
-document.getElementById('modeToggle').onclick=()=>{
- document.getElementById('carouselMode').classList.toggle('active');
- document.getElementById('roomMode').classList.toggle('active');
-};
-</script>
+    // Coordinates for room layout
+    const coords = {
+      "DH.png":  [600, 150],
+      "A01.png": [800, 150],
+      "A02.png": [1000,150],
+      "A03.png": [1200,150],
+
+      "A04.png": [400,350],
+      "A05.png": [400,550],
+      "A06.png": [400,750],
+      "R.png":   [400,950],
+
+      "B01.png": [1600,350],
+      "B02.png": [1600,500],
+      "B03.png": [1600,650],
+      "B04.png": [1600,800],
+      "B05.png": [1600,950],
+      "B06.png": [1600,1100],
+
+      "C01.png": [700,1150],
+      "C02.png": [900,1150],
+      "C03.png": [1100,1150],
+      "C04.png": [1300,1150],
+
+      "C05.png": [950,750],
+      "C.png":   [1100,750],
+    };
+
+    const C02_LINKS = ["A01.png","B01.png","B02.png","A06.png","A03.png"];
+
+    /* ---------------- MODE SWITCH ---------------- */
+
+    const carouselMode = document.getElementById("carouselMode");
+    const roomMode     = document.getElementById("roomMode");
+    const toggleCarousel = document.getElementById("toggleCarousel");
+    const toggleRoom     = document.getElementById("toggleRoom");
+
+    function showCarousel() {
+      carouselMode.classList.add("active");
+      roomMode.classList.remove("active");
+      toggleCarousel.classList.add("active");
+      toggleRoom.classList.remove("active");
+    }
+
+    function showRoom() {
+      roomMode.classList.add("active");
+      carouselMode.classList.remove("active");
+      toggleRoom.classList.add("active");
+      toggleCarousel.classList.remove("active");
+    }
+
+    document.getElementById("modeToggle").addEventListener("click", () => {
+      if (carouselMode.classList.contains("active")) {
+        showRoom();
+      } else {
+        showCarousel();
+      }
+    });
+
+    /* ---------------- MODE 1: CAROUSEL ---------------- */
+
+    function initCarousel() {
+      const container = document.getElementById("carouselInner");
+      posters.forEach(p => {
+        const card = document.createElement("div");
+        card.className = "posterCard";
+        card.innerHTML = `
+          <img src="${p}" alt="${p}">
+          <div class="posterLabel">${p.replace(".png","")}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    /* ---------------- MODE 2: ROOM VIEW ---------------- */
+
+    const linesSvg   = document.getElementById("lines");
+    const roomWrapper = document.getElementById("roomWrapper");
+    const nodeElements = {};   // filename -> DOM node
+
+    function initRoom() {
+      for (const p of posters) {
+        const [x,y] = coords[p];
+        if (!x || !y) continue; // safety
+
+        const node = document.createElement("div");
+        node.className = "posterNode";
+        node.style.left = x + "px";
+        node.style.top  = y + "px";
+        node.innerHTML = `
+          <img src="${p}" alt="${p}">
+          <div class="posterNodeLabel">${p.replace(".png","")}</div>
+        `;
+
+        node.addEventListener("click", () => handleNodeClick(p));
+
+        roomWrapper.appendChild(node);
+        nodeElements[p] = node;
+      }
+    }
+
+    function clearLines() {
+      while (linesSvg.firstChild) linesSvg.removeChild(linesSvg.firstChild);
+      Object.values(nodeElements).forEach(n => n.classList.remove("active"));
+    }
+
+    function handleNodeClick(posterName) {
+      clearLines();
+      const node = nodeElements[posterName];
+      if (!node) return;
+
+      node.classList.add("active");
+
+      if (posterName !== "C02.png") return;
+
+      const start = coords["C02.png"];
+      C02_LINKS.forEach(target => {
+        const end = coords[target];
+        if (!end) return;
+        const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+        line.setAttribute("x1", start[0]);
+        line.setAttribute("y1", start[1]);
+        line.setAttribute("x2", end[0]);
+        line.setAttribute("y2", end[1]);
+        line.setAttribute("stroke", "#9a0f0f");
+        line.setAttribute("stroke-width", "3");
+        line.setAttribute("stroke-linecap", "round");
+        linesSvg.appendChild(line);
+      });
+    }
+
+    /* ---------------- INIT ---------------- */
+
+    initCarousel();
+    initRoom();
+    showCarousel();   // start in carousel mode
+  </script>
 </body>
 </html>
